@@ -1,4 +1,7 @@
 *.swp
 *.exe
 *.out
+temp*
+*.nanorc
+*.rc
 
