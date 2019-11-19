@@ -10,46 +10,7 @@
  *
  */
 
-#include <algorithm>
-#include <cctype>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <experimental/filesystem>
-
-#include <boost/program_options.hpp>
-
-#include <ncurses.h>
-#include <unistd.h>
-
-#include "colors.h"
-
-namespace po = boost::program_options;
-namespace std{
-	namespace filesystem = std::experimental::filesystem;
-};
-
-std::vector<std::string> recurse(std::vector<std::string> paths); 
-std::vector<std::string> rcParse(std::string rcfile, std::string mode);
-std::vector<std::string> lineParse(std::string line, std::vector<std::string>);
-std::vector<std::string> codeParse(std::string filename);
-
-void write(std::string filename, std::string mode);
-
-std::string identify_keyword(std::string line, std::string indicator, 
-									  int pos, const int ii);
-size_t contains_indicator(std::string line, std::string &ind, int &ii);
-
-void sort(std::vector<std::string> &keywords);
-void sort(std::vector<std::string> &keywords, std::vector<bool> &changed);
-
-void print_table(std::vector<std::string> strings, 
-					  std::vector<bool> changed = std::vector<bool>(), 
-					  std::string mode = "user", int tabsize=4);
-void tab(int tabsize=8);
-std::string tolower(std::string str);
+#include "nanorc.h"
 
 bool verbose;
 std::vector<std::string> files;
@@ -62,6 +23,15 @@ std::vector<std::string> indicators;
 static std::vector<std::string> extensions = {"h", "h++", "hpp", "c", "c++", "cpp"};
 static std::vector<std::string> rgx = {"[^A-Za-z0-9\\_]", "^", "[^A-Za-z0-9\\_]", "^"};
 static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]*", "[^A-Za-z0-9\\_]", "$", "$"};
+
+static std::vector<std::string> cpp_operators = {"(", ")", "[", "]", "{", "}", ",", ".", "::",
+															"-", "+", "/", "*", "<", ">", ";"};
+static std::vector<std::string> cpp_types = {"bool", "int", "char", "true", "false", "float", 
+													  "double", "long", "signed", "unsigned"};
+static std::vector<std::string> cpp_kwords = {"for", "if", "while", "do while", "break", 
+														  "namespace", "typedef", "enum", "exit", 
+														  "return", "try", "catch", "else", "continue"};
+														  
 
 int main(int argn, char** argv) {
 	std::string ofile("");
@@ -493,6 +463,60 @@ void write(std::string filename, std::string mode) {
 	return;
 }
 
+std::vector<std::pair<std::string, lex_type> > lex(std::string file, std::string language) {
+//--------------------------------------------------------------------
+// Front end for language specific lexing functions. Supported 
+// languages are: C++.
+//--------------------------------------------------------------------
+	std::vector<std::pair<std::string, lex_type> > lexumes;
+	language = tolower(language);
+	if (language == "c++") {
+		lexumes = cpp_lex(file);
+	}
+	return lexumes;
+}
+
+std::vector<std::pair<std::string, lex_type> > cpp_lex(std::string file) {
+//--------------------------------------------------
+// Lexer for C++ files
+//--------------------------------------------------
+	std::vector<std::pair<std::string, lex_type> > lexumes;
+	std::string lexume("");
+	std::pair<std::string, lex_type> lexume_pair;
+	std::ifstream fp(file);
+	char p;
+	int length;
+	for (std::string line; getline(fp, line); ) {
+		p = line[0];
+		length = line.length();
+		if (length > 1 && line[0] == '/' && line[1] == '/') {
+			lexumes.push_back(std::make_pair(line, lex_type::comment));		
+		}
+		for (int ii = 0; ii < length; ii ++) {
+			if (p == '/' && line[ii] == '*') {												// Multiline comments
+				while (!(p == '*' && line[ii] == '/')) {
+					p = line[ii];
+					lexume += p;
+					ii ++;
+				}
+				lexume_pair = std::make_pair(lexume, lex_type::comment);
+				lexumes.push_back(lexume_pair);
+			}
+			if (contains(cpp_operators, std::string(1, line[ii]))) {					// Operators
+				lexume_pair = std::make_pair(std::string(1, line[ii]), lex_type::operators);
+				lexumes.push_back(lexume_pair);
+			}
+			else if (line[ii] == '\'') {														// Character literals
+				lexume_pair = std::make_pair(std::string(1, line[ii+1]), lex_type::characters);
+				lexumes.push_back(lexume_pair);
+			}
+			p = line[ii];
+		}
+	}
+	
+	return lexumes;
+}
+
 std::string identify_keyword(std::string line, std::string indicator, int pos, const int ii) {
 	std::string keyword;
 	std::string _keyword;
@@ -568,6 +592,10 @@ size_t contains_indicator(std::string line, std::string &ind, int& ii) {
 	return pos;
 }
 
+bool contains(std::vector<std::string> v, std::string item) {
+	return (std::find(v.begin(), v.end(), item) == v.end());
+}
+
 void sort(std::vector<std::string> &keywords) {
 	for (int ii = 0; ii < keywords.size(); ii ++) {
 		for (int jj = ii; jj < keywords.size(); jj ++) {
@@ -600,80 +628,3 @@ void sort(std::vector<std::string> &keywords, std::vector<bool> &changed) {
 	return;
 }
 
-void print_table(std::vector<std::string> strings, std::vector<bool> changed, 
-		std::string mode, int tabsize) {
-    int nelements = strings.size();
-    int max_length = 0;
-    for (int ii = 0; ii < nelements; ii ++) {
-        if (strings[ii].length() > max_length) {
-            max_length = strings[ii].length();
-        }
-    }
-    // Get the screen width and height to print driver names more cleanly
-    int width;
-    int height;
-    initscr();
-    getmaxyx(stdscr, height, width);
-    endwin();
-    width = width - max_length - 10;                // Put {tabsize} plus one column width buffer
-    if (width <= 0) {
-        width = 100;
-    }
-    if (max_length <= 0) {
-        max_length = 10;
-    }
-    int ii = 0;
-    int jj = 0;
-    int pos;
-    int ncolumns = width/max_length;
-    if (ncolumns == 0) ncolumns = 1;
-    int nrows = nelements/ncolumns;
-
-    tab(tabsize);
-    while (ii < nrows) {
-        for (jj = 0; jj <= ncolumns; jj ++) {
-            if (ii+jj*nrows >= strings.size()) {
-                ncolumns--;
-                std::cout << std::endl;
-                tab(tabsize);
-                break;
-            }
-            if (mode == "user") {
-       			std::cout << bright+cyan;
-       		}
-       		else if (mode == "lib") {
-       			std::cout << bright+yellow;
-       		}
-			if (keywords.begin(), std::find(keywords.begin(), 
-				  keywords.end(), strings[ii+jj*nrows]) != keywords.end()) {
-				int pos = std::distance(keywords.begin(), std::find(
-				  keywords.begin(), keywords.end(), strings[ii+jj*nrows]));
-				if (pos < changed.size() && changed[pos]) {	
-            		std::cout << bright+green;
-            	}
-           	}
-            std::cout << std::left << std::setw(max_length) << strings[ii+jj*nrows];
-            std::cout << " " << white+res;
-            if (jj % (ncolumns+1) == ncolumns) {
-                std::cout << std::endl;
-                tab(tabsize);
-            }
-        }
-        ii ++;
-    }
-    std::cout << std::endl;
-}
-
-void tab(int tabsize) {
-	for (int ii = 0; ii < tabsize; ii ++) {
-		std::cout << " ";
-	}
-}
-
-std::string tolower(std::string str) {
-	std::string ret;
-	for (int ii = 0; ii < str.size(); ii ++) {
-		ret += std::tolower(str[ii]);
-	}
-	return ret;
-}
