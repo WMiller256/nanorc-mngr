@@ -16,8 +16,6 @@ bool verbose;
 bool lexverbose;
 std::vector<std::string> files;
 std::vector<std::string> keywords;
-std::string current_file;
-int current_line;
 std::string keywordColor;
 std::vector<std::string> specifiers;
 
@@ -25,8 +23,6 @@ static std::vector<std::string> extensions = {"h", "h++", "hpp", "c", "c++", "cp
 static std::vector<std::string> rgx = {"[^A-Za-z0-9\\_]", "^", "[^A-Za-z0-9\\_]", "^"};
 static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]*", "[^A-Za-z0-9\\_]", "$", "$"};
 
-static std::vector<std::string> cpp_operators = {"(", ")", "[", "]", "{", "}", ",", ".", "::",
-												"-", "+", "/", "*", "<", ">", ";"};
 static std::vector<std::string> cpp_types = {"bool", "int", "char", "true", "false", "float", 
 											  "double", "long", "signed", "unsigned"};
 static std::vector<std::string> cpp_kwords = {"for", "if", "while", "do while", "break", 
@@ -42,9 +38,6 @@ int main(int argn, char** argv) {
 	po::options_description description("Allowed Options");
 	po::positional_options_description positional;
 
-	current_file = "";
-	current_line = 0;
-	
 	std::cout << white;
 
 	try {
@@ -337,50 +330,6 @@ std::vector<std::string> lineParse(std::string line, std::vector<std::string> ke
 	}
 	return parsed;
 }
-
-std::vector<std::string> codeParse(std::string filename) {
-	std::ifstream file(filename);
-	current_file = filename;
-	std::vector<std::string> parsed;
-	std::string line;
-	std::string keyword("");
-	current_line = 0;
-	while (std::getline(file, line)) {
-		int ii = 0;
-		size_t pos;
-		std::string ind("");
-		size_t comment;
-		keyword = "";
-		current_line ++;
-		if ((comment = line.find("/*")) != std::string::npos) {
-			if ((pos = contains_specifier(line, ind, ii)) < comment) {
-				keyword = identify_keyword(line.substr(0, comment), ind, pos, ii);
-			}
-			while (std::getline(file, line)) {
-				current_line ++;
-				if ((comment = line.find("*/")) != std::string::npos) {
-					if ((pos = contains_specifier(line, ind, ii)) > comment &&
-						 pos != std::string::npos) {
-						pos = contains_specifier(line.substr(comment), ind, ii);
-						keyword = identify_keyword(line.substr(comment), ind, pos, ii);
-					}
-					std::getline(file, line);
-					current_line ++;
-					break;
-				}
-			}
-		}
-		if ((pos = contains_specifier(line, ind, ii)) != std::string::npos) {
-			keyword = identify_keyword(line, ind, pos, ii);
-		}
-		if (keyword != "") { 
-			parsed.push_back(keyword);
-		}
-	}
-	file.close();
-	return parsed;
-}
-
 void write(std::string filename, std::string mode) {
 	std::ifstream file(filename);
 	std::string line("");
@@ -467,81 +416,6 @@ void write(std::string filename, std::string mode) {
 	
 	file.close();
 	return;
-}
-
-std::string identify_keyword(std::string line, std::string specifier, int pos, const int ii) {
-	std::string keyword;
-	std::string _keyword;
-	try {
-		keyword = line.substr(pos);
-		keyword = keyword.substr(keyword.find_first_of(specifier));
-		_keyword = keyword.substr(keyword.find_first_of(" \t") + 1);
-		pos = _keyword.find_first_of(":{;");
-		if (pos != std::string::npos) {
-			_keyword = _keyword.substr(0, pos);
-		}
-		while (_keyword.find_first_of("<>::") != std::string::npos
-				 && _keyword.find_first_of(" \t") != std::string::npos) {
-			keyword = keyword.substr(keyword.find_first_of(" \t")+1);
-			_keyword = keyword;
-		}
-		keyword = _keyword;
-//		}
-//		else if (std::isspace(line[pos - 1])) {
-/*			if (keyword.find("{") > keyword.find(";")) {  // }
-				keyword = keyword.substr(0, keyword.find_first_of(";"));
-				keyword = keyword.substr(keyword.find_last_of(" \t"));
-			}
-			else if (keyword.find("{") < keyword.find(";")) {  // }
-				keyword = keyword.substr(0, keyword.find_first_of(" \t;"));		
-			}
-*/
-	}
-	catch (std::system_error &error) {
-		std::cerr << "Exception -- " << error.what();
-	}
-	catch (...) {
-		std::cerr << "Exception -- " << " Unknown Exception caught on line " <<
-			__LINE__ << " in file "+bright+yellow << __FILE__ << res+white+"." 
-			<< std::endl;
-		std::cerr << "Exception raised while parsing the line\n" << line << std::endl;
-	}
-	if (std::find(keywords.begin(), keywords.end(), 
-		keyword) == keywords.end()) {	
-		if (verbose) {
-			std::cout << "Keyword specifier "+bright+green+specifiers[ii]+res+white+" found in line "
-				<< magenta << current_line << res+white+" of file " << yellow+current_file+res+white 
-				<< "\n    " << bright+line.substr(line.find_first_not_of(" \t"))+res+white
-				<< std::endl;
-			std::cout << "    ";
-			std::cout << green;
-			for (int kk = 0; kk < specifiers[ii].size(); kk ++) {
-				std::cout << "*";
-			}
-			std::cout << res+white << std::endl;
-			std::cout << "  Keyword identified as "+bright+cyan+keyword+res+white+"\n";
-		}
-	}
-	else {
-		keyword = "";
-	}
-	return keyword;
-}
-
-size_t contains_specifier(std::string line, std::string &ind, int& ii) {
-	size_t pos = std::string::npos;
-	for (ii = 0; ii < specifiers.size(); ii ++) {
-		if ((pos = line.find(specifiers[ii]+" ")) != std::string::npos
-			&& line.find("//") > pos) {
-			ind = specifiers[ii];
-			break;
-		}
-		else {
-			ind = "";
-			pos = std::string::npos;
-		}
-	}
-	return pos;
 }
 
 bool contains(std::vector<std::string> v, std::string item) {
