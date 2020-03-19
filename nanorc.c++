@@ -13,25 +13,25 @@
 #include "nanorc.h"
 
 bool verbose;
+bool lexverbose;
 std::vector<std::string> files;
 std::vector<std::string> keywords;
 std::string current_file;
 int current_line;
 std::string keywordColor;
-std::vector<std::string> indicators;
+std::vector<std::string> specifiers;
 
 static std::vector<std::string> extensions = {"h", "h++", "hpp", "c", "c++", "cpp"};
 static std::vector<std::string> rgx = {"[^A-Za-z0-9\\_]", "^", "[^A-Za-z0-9\\_]", "^"};
 static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]*", "[^A-Za-z0-9\\_]", "$", "$"};
 
 static std::vector<std::string> cpp_operators = {"(", ")", "[", "]", "{", "}", ",", ".", "::",
-															"-", "+", "/", "*", "<", ">", ";"};
+												"-", "+", "/", "*", "<", ">", ";"};
 static std::vector<std::string> cpp_types = {"bool", "int", "char", "true", "false", "float", 
-													  "double", "long", "signed", "unsigned"};
+											  "double", "long", "signed", "unsigned"};
 static std::vector<std::string> cpp_kwords = {"for", "if", "while", "do while", "break", 
-														  "namespace", "typedef", "enum", "exit", 
-														  "return", "try", "catch", "else", "continue"};
-														  
+											  "namespace", "typedef", "enum", "exit", 
+											  "return", "try", "catch", "else", "continue"};
 
 int main(int argn, char** argv) {
 	std::string ofile("");
@@ -50,23 +50,25 @@ int main(int argn, char** argv) {
 	try {
 		description.add_options()
 			("files,f", po::value<std::vector<std::string> >()->multitoken(), 
-					"The files to parse")
+				"The files to parse")
 			("rcfile,o", po::value<std::string>(&ofile)->default_value(".rc"),
-					"The rc (output) file.")
+				"The rc (output) file.")
 			("color,c", po::value<std::string>(&keywordColor)->
-					default_value("default"), "The desired color to use for" 
-					" syntax highlighting.")
+				default_value("default"), "The desired color to use for" 
+				" syntax highlighting.")
 			("user, u", po::bool_switch()->default_value(false), 
-					"Parsing mode for user defined keywords.")
+				"Parsing mode for user defined keywords.")
 			("lib, l", po::bool_switch()->default_value(false), 
-					"Parsing mode for library keywords.")
-			("indicators,i",po::value<std::vector<std::string> >()->multitoken(), 
-					"The keyword indicators to include - C++ defaults are 'typedef',"
-					"'struct', 'class', 'namespace'")
+				"Parsing mode for library keywords.")
+			("specifiers,i",po::value<std::vector<std::string> >()->multitoken(), 
+				"The keyword specifiers to include - C++ defaults are 'typedef',"
+				"'class', 'namespace'")
 			("verbose,v", po::bool_switch()->default_value(false), "Enable verbose"
-					" output.")
+				" output.")
+			("lexverbose,l", po::bool_switch()->default_value(false), "Enable verbose"
+				" lexing output.")
 			("recursive,r", po::bool_switch()->default_value(false), "Enable recursive"
-					"searcing.") 
+				"searcing.") 
 	    ;
 	    positional.add("color", 1);
 	    positional.add("rcfile", 1);
@@ -78,22 +80,23 @@ int main(int argn, char** argv) {
 
 	po::variables_map vm;
 	po::store(po::command_line_parser(argn, argv).options(description)
-			.positional(positional).run(), vm);
+			. positional(positional).run(), vm);
 	po::notify(vm);
 	
 	
 	lib = vm["lib"].as<bool>();
 	user = vm["user"].as<bool>();
 	verbose = vm["verbose"].as<bool>();
+	lexverbose = vm["lexverbose"].as<bool>();
 	recursive = vm["recursive"].as<bool>();
 	if (vm.count("files")) files = vm["files"].as<std::vector<std::string> >();
-	if (vm.count("indicators")) indicators = vm["indicators"].as<std::vector<std::string> >();
+	if (vm.count("specifiers")) specifiers = vm["specifiers"].as<std::vector<std::string> >();
 	if (lib == false && user == false) user = true;
 	if (lib && user) lib = false;
 	if (keywordColor == "default" && lib) keywordColor = "brightyellow";
 	if (keywordColor == "default" && user) keywordColor = "brightcyan";
-	if (indicators.empty()) {
-		indicators = {"typedef", "struct", "class", "namespace"};
+	if (specifiers.empty()) {
+		specifiers = {"typedef", "class", "namespace"};
 	}
 	
 	if (lib) {
@@ -102,7 +105,7 @@ int main(int argn, char** argv) {
 	else {
 		mode = "user";
 	}
-	
+
 	std::string pref = "User";
 	if (std::filesystem::exists(ofile)) {
 		keywords = rcParse(ofile, mode);
@@ -134,12 +137,15 @@ int main(int argn, char** argv) {
 			std::cout << bright+yellow << files[ii] << res+white << std::endl;
 		}	
 	}
+	Lexer lexer = Lexer(specifiers);
+	int nchanged;
+	for (auto file: files) {
+		if (std::filesystem::exists(file)) {
+			std::cout << "Lexing "+yellow << file << res+white << " ... " << std::flush;
+			lexer.lex(file, "c++");
+			nchanged = lexer.find_new_keywords(keywords);
+			std::cout << bright+green+" complete"+res+white+".\n" << std::flush;
 	
-	for (int ii = 0; ii < files.size(); ii ++) {
-		if (std::filesystem::exists(files[ii])) {
-			std::vector<std::string> newKeywords = codeParse(files[ii]);
-			keywords.insert(keywords.end(), newKeywords.begin(), 
-					newKeywords.end());
 		}
 	}
 	int unchanged = changed.size();
@@ -347,15 +353,15 @@ std::vector<std::string> codeParse(std::string filename) {
 		keyword = "";
 		current_line ++;
 		if ((comment = line.find("/*")) != std::string::npos) {
-			if ((pos = contains_indicator(line, ind, ii)) < comment) {
+			if ((pos = contains_specifier(line, ind, ii)) < comment) {
 				keyword = identify_keyword(line.substr(0, comment), ind, pos, ii);
 			}
 			while (std::getline(file, line)) {
 				current_line ++;
 				if ((comment = line.find("*/")) != std::string::npos) {
-					if ((pos = contains_indicator(line, ind, ii)) > comment &&
+					if ((pos = contains_specifier(line, ind, ii)) > comment &&
 						 pos != std::string::npos) {
-						pos = contains_indicator(line.substr(comment), ind, ii);
+						pos = contains_specifier(line.substr(comment), ind, ii);
 						keyword = identify_keyword(line.substr(comment), ind, pos, ii);
 					}
 					std::getline(file, line);
@@ -364,7 +370,7 @@ std::vector<std::string> codeParse(std::string filename) {
 				}
 			}
 		}
-		if ((pos = contains_indicator(line, ind, ii)) != std::string::npos) {
+		if ((pos = contains_specifier(line, ind, ii)) != std::string::npos) {
 			keyword = identify_keyword(line, ind, pos, ii);
 		}
 		if (keyword != "") { 
@@ -463,66 +469,12 @@ void write(std::string filename, std::string mode) {
 	return;
 }
 
-std::vector<std::pair<std::string, lex_type> > lex(std::string file, std::string language) {
-//--------------------------------------------------------------------
-// Front end for language specific lexing functions. Supported 
-// languages are: C++.
-//--------------------------------------------------------------------
-	std::vector<std::pair<std::string, lex_type> > lexumes;
-	language = tolower(language);
-	if (language == "c++") {
-		lexumes = cpp_lex(file);
-	}
-	return lexumes;
-}
-
-std::vector<std::pair<std::string, lex_type> > cpp_lex(std::string file) {
-//--------------------------------------------------
-// Lexer for C++ files
-//--------------------------------------------------
-	std::vector<std::pair<std::string, lex_type> > lexumes;
-	std::string lexume("");
-	std::pair<std::string, lex_type> lexume_pair;
-	std::ifstream fp(file);
-	char p;
-	int length;
-	for (std::string line; getline(fp, line); ) {
-		p = line[0];
-		length = line.length();
-		if (length > 1 && line[0] == '/' && line[1] == '/') {
-			lexumes.push_back(std::make_pair(line, lex_type::comment));		
-		}
-		for (int ii = 0; ii < length; ii ++) {
-			if (p == '/' && line[ii] == '*') {												// Multiline comments
-				while (!(p == '*' && line[ii] == '/')) {
-					p = line[ii];
-					lexume += p;
-					ii ++;
-				}
-				lexume_pair = std::make_pair(lexume, lex_type::comment);
-				lexumes.push_back(lexume_pair);
-			}
-			if (contains(cpp_operators, std::string(1, line[ii]))) {					// Operators
-				lexume_pair = std::make_pair(std::string(1, line[ii]), lex_type::operators);
-				lexumes.push_back(lexume_pair);
-			}
-			else if (line[ii] == '\'') {														// Character literals
-				lexume_pair = std::make_pair(std::string(1, line[ii+1]), lex_type::characters);
-				lexumes.push_back(lexume_pair);
-			}
-			p = line[ii];
-		}
-	}
-	
-	return lexumes;
-}
-
-std::string identify_keyword(std::string line, std::string indicator, int pos, const int ii) {
+std::string identify_keyword(std::string line, std::string specifier, int pos, const int ii) {
 	std::string keyword;
 	std::string _keyword;
 	try {
 		keyword = line.substr(pos);
-		keyword = keyword.substr(keyword.find_first_of(indicator));
+		keyword = keyword.substr(keyword.find_first_of(specifier));
 		_keyword = keyword.substr(keyword.find_first_of(" \t") + 1);
 		pos = _keyword.find_first_of(":{;");
 		if (pos != std::string::npos) {
@@ -557,13 +509,13 @@ std::string identify_keyword(std::string line, std::string indicator, int pos, c
 	if (std::find(keywords.begin(), keywords.end(), 
 		keyword) == keywords.end()) {	
 		if (verbose) {
-			std::cout << "Keyword indicator "+bright+green+indicators[ii]+res+white+" found in line "
+			std::cout << "Keyword specifier "+bright+green+specifiers[ii]+res+white+" found in line "
 				<< magenta << current_line << res+white+" of file " << yellow+current_file+res+white 
 				<< "\n    " << bright+line.substr(line.find_first_not_of(" \t"))+res+white
 				<< std::endl;
 			std::cout << "    ";
 			std::cout << green;
-			for (int kk = 0; kk < indicators[ii].size(); kk ++) {
+			for (int kk = 0; kk < specifiers[ii].size(); kk ++) {
 				std::cout << "*";
 			}
 			std::cout << res+white << std::endl;
@@ -576,12 +528,12 @@ std::string identify_keyword(std::string line, std::string indicator, int pos, c
 	return keyword;
 }
 
-size_t contains_indicator(std::string line, std::string &ind, int& ii) {
+size_t contains_specifier(std::string line, std::string &ind, int& ii) {
 	size_t pos = std::string::npos;
-	for (ii = 0; ii < indicators.size(); ii ++) {
-		if ((pos = line.find(indicators[ii]+" ")) != std::string::npos
+	for (ii = 0; ii < specifiers.size(); ii ++) {
+		if ((pos = line.find(specifiers[ii]+" ")) != std::string::npos
 			&& line.find("//") > pos) {
-			ind = indicators[ii];
+			ind = specifiers[ii];
 			break;
 		}
 		else {
@@ -593,7 +545,7 @@ size_t contains_indicator(std::string line, std::string &ind, int& ii) {
 }
 
 bool contains(std::vector<std::string> v, std::string item) {
-	return (std::find(v.begin(), v.end(), item) == v.end());
+	return (std::find(v.begin(), v.end(), item) != v.end());
 }
 
 void sort(std::vector<std::string> &keywords) {

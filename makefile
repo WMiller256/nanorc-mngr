@@ -25,15 +25,18 @@ MAGENTA = \033[35m
 YELLOW  = \033[33m
 
 #Source files
-SRCS	= $(ABS)/rcio.c++
-OBJS	= $(BUILD)/rcio.o
+SRCS	= $(ABS)/rcio.c++ \
+		  $(ABS)/lexer.c++
+OBJS	= $(BUILD)/rcio.o \
+		  $(BUILD)/lexer.o \
+		  $(BUILD)/nanorc.o
 
 #Builds
 all:
-	@printf "[      $(YELLOW)Building $(OPT)$(TEST)$(WHITE)       ]\n"
-	@printf "[$(BLUE)Building$(WHITE)] $(BRIGHT)$(OPT)$(TEST)$(WHITE) - $(MAGENTA)Program$(WHITE)\n"
+	@printf "[      $(YELLOW)Building $(MAIN)$(WHITE)       ]\n"
+	@printf "[$(BLUE)Building$(WHITE)] $(BRIGHT)$(MAIN)$(WHITE) - $(MAGENTA)Program$(WHITE)\n"
 	make -f makefile nanorc
-	@printf "[$(GREEN) Built  $(WHITE)] $(BRIGHT)$(OPT)$(TEST)$(WHITE) - $(MAGENTA)Program$(WHITE)\n"
+	@printf "[$(GREEN) Built  $(WHITE)] $(BRIGHT)$(MAIN)$(WHITE) - $(MAGENTA)Program$(WHITE)\n"
 	@printf "[        $(GREEN)Build Complete$(WHITE)        ]\n"
 
 $(BUILD)/%.o: %.c++
@@ -42,11 +45,7 @@ $(BUILD)/%.o: %.c++
 	@printf "[$(GREEN) Built  $(WHITE)]   $(BRIGHT)$<$(WHITE) - $(MAGENTA)Object$(WHITE)\n"
 
 nanorc: $(OBJS)
-	@printf "[      $(YELLOW)Building $(OPT)$(TEST)$(WHITE)       ]\n"
-	@printf "[$(BLUE)Building$(WHITE)] $(BRIGHT)$(OPT)$(TEST)$(WHITE) - $(MAGENTA)Program$(WHITE)\n"
-	cd $(ABS); $(CC) $(OBJS) $(BUILD)/nanorc.o $(LIBDIRS) -o $(BIN)/$(MAIN) $(LIBS)
-	@printf "[$(GREEN) Built  $(WHITE)] $(BRIGHT)$(OPT)$(TEST)$(WHITE) - $(MAGENTA)Program$(WHITE)\n"
-	@printf "[        $(GREEN)Build Complete$(WHITE)        ]\n"
+	cd $(ABS); $(CC) $(OBJS) $(LIBDIRS) -o $(BIN)/$(MAIN) $(LIBS)
 	
 clean:
 	$(RM) *.core $(BUILD)/*.o *.d *.stackdump

@@ -5,3 +5,5 @@ temp*
 *.nanorc
 *.rc
 
+check.c++
+
