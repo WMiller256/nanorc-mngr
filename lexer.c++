@@ -15,20 +15,25 @@ void Lexer::lex(std::string file, std::string language) {
 // Front end for language specific lexing functions. Supported 
 // languages are: C++.
 //--------------------------------------------------------------------
+	this->file = file;
 	language = tolower(language);
 	if (language == "c++") {
-		cpp_lex(file);
+		cpp_lex();
 	}
 }
 
-void Lexer::cpp_lex(std::string file) {
+void Lexer::cpp_lex() {
 //------------------------------------------------------------------------
 // Lexer for C++ files
 //
 // Assumes proper closure of all parenthesis, bracket, brace pairs and
-// all strings and multitline comments.
+// all strings and multitline comments. 
+//
+// WARNING: Does not support multiline comment nesting.
 //------------------------------------------------------------------------
-	std::ifstream fp(file);
+	std::ifstream f(file);
+	stream = RCStreamBuf(f.rdbuf());
+	std::istream fp(&stream);
 	std::string lexeme("");
 
 	int length = get_length(file);
@@ -131,9 +136,11 @@ void Lexer::cpp_lex(std::string file) {
 			this->append(lexeme);
 		}
 		else if (isspace(code[idx])) {
+			lexeme = code[idx++];
 			while (isspace(code[idx])) {
-				idx++;
+				lexeme += code[idx++];
 			}
+			this->append(lexeme);
 		}
 		else if (code[idx] == '\\') {
 			while(isspace(code[++idx])) {}
@@ -148,10 +155,12 @@ void Lexer::cpp_lex(std::string file) {
 int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 	size_t size = lexemes.size();
 	int n = 0;
+	int ctx_start = 0;
 	for (int ii = 0; ii < size; ii ++) {
 		if (lexemes[ii].first == "class" || lexemes[ii].first == "namespace") {
 			if (ii < size - 1) {
-				n += add_kw(lexemes[++ii], keywords);
+				std::get<0>(lexemes[++ii].second) = make_context(ii - 1, ii);
+				n += add_kw(lexemes[ii], keywords);
 			}
 			else {
 				std::cout << "Extraction of new keywords terminated: ";
@@ -159,6 +168,7 @@ int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 			}
 		}
 		else if (lexemes[ii].first == "typedef") {
+			ctx_start = ii;
 			while (lexemes[ii + 1].first != ";") {
 				ii++;
 				if (ii + 1 > size - 1) {
@@ -166,26 +176,39 @@ int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 					std::cout << "last lexeme was specifier.";
 				}
 			}
+			std::get<0>(lexemes[ii].second) = make_context(ctx_start, ii);
 			n += add_kw(lexemes[ii], keywords);
 		}
 	}
 	return n;
 }
 
-int Lexer::add_kw(std::pair<std::string, std::tuple<std::string, std::string, int> > lexeme, std::vector<std::string> &keywords) {
-	if (!contains(keywords, lexeme.first)) {
-		keywords.push_back(lexeme.first);
-		auto [context, file, line] = lexeme.second;
+int Lexer::add_kw(std::pair<std::string, std::tuple<std::string, std::string, int> > context, std::vector<std::string> &keywords) {
+	if (!contains(keywords, context.first)) {
+		keywords.push_back(context.first);
+		auto [ctx, file, line] = context.second;
 		if (verbose) {
-			std::cout << "Keyword specifier found in line "
-				<< magenta << line << res+white+" of file " << yellow+file+res+white 
-				<< std::endl;
-			std::cout << res+white << std::endl;
-			std::cout << "  Keyword identified as "+bright+cyan+lexeme.first+res+white+"\n";
+			std::cout << "Keyword specifier found in line " << magenta << line << res+white+" of file " 
+				<< yellow+file+res+white << std::endl << "  Keyword identified as "
+				<< bright+cyan+context.first+res+white+"\n";
 		}
 		return 1;
 	}
 	return 0;
+}
+
+std::string Lexer::make_context(int start, int end) {
+	int lsize = lexemes.size() - 1;
+	int ctx_s = start - ctx_depth > 0 ? start - ctx_depth : 0;
+	int ctx_e = end + ctx_depth < lsize ? end + ctx_depth : lsize;
+	while (ctx_s > 0 && lexemes[ctx_s-- - 1].first.find("\n") == std::string::npos) {}
+	while (ctx_e < lsize && lexemes[ctx_e++ + 1].first.find("\n") == std::string::npos) {}
+	
+	std::string context("");
+	for (int ii = ctx_s; ii < ctx_e; ii ++) {
+		context += lexemes[ii].first;
+	}
+	return context;
 }
 
 std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > > Lexer::get_lexemes() {
@@ -194,7 +217,7 @@ std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > >
 
 void Lexer::append(std::string &lexeme) {
 	if (lexeme == "") return;
-	std::tuple meta = std::make_tuple("", "", 0);
+	std::tuple meta = std::make_tuple("", file, stream.line());
 	lexemes.push_back(std::make_pair(lexeme, meta));
 	lexeme = "";
 }

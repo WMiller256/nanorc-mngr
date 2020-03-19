@@ -4,6 +4,6 @@
 temp*
 *.nanorc
 *.rc
-
 check.c++
 
+build/*.o

@@ -32,6 +32,7 @@
 
 #include "colors.h"
 #include "rcio.h"
+#include "rcstreambuf.h"
 
 namespace po = boost::program_options;
 namespace std{
@@ -64,20 +65,26 @@ private:
 
 	std::vector<std::string> specifiers;
 	std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > > lexemes;
+
+	std::string file;
+	RCStreamBuf stream;
+
+	int ctx_depth = 5;
+
 public:
 	Lexer(std::vector<std::string> specifiers = {});
 
 	void lex(std::string file, std::string language);
-	void cpp_lex(std::string file);
+	void cpp_lex();
 	int find_new_keywords(std::vector<std::string> &keywords);
-	int add_kw(std::pair<std::string, std::tuple<std::string, std::string, int> > lexeme, std::vector<std::string> &keywords);
+	int add_kw(std::pair<std::string, std::tuple<std::string, std::string, int> > context, std::vector<std::string> &keywords);
+	std::string make_context(int start, int end);
 	std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > > get_lexemes();
 	void append(std::string &lexeme);
 
 	bool isoperator(char c);
 	bool isoperator(std::string s);
 	int get_length(std::string file);
-
 };
 
 bool contains(std::vector<std::string> v, std::string item);					// Return if {v} contains {item}
