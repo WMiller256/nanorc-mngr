@@ -32,193 +32,196 @@ void Lexer::cpp_lex() {
 // WARNING: Does not support multiline comment nesting.
 //------------------------------------------------------------------------
 	std::ifstream f(file);
-	stream = RCStreamBuf(f.rdbuf());
-	std::istream fp(&stream);
+	sb = RCStreamBuf(f.rdbuf());
 	std::string lexeme("");
 
 	int length = get_length(file);
-	int idx = 0;
 	int prev = -1;
 
-	char in;
-	char* code = new char[length];
-	while (fp.get(in) ) {					// Read input into character array
-		code[idx++] = in;
-	}
-	idx = 0;
-	
-	while (idx < length - 1) {
-		if (prev == idx) {
-			std::cout << "Problem with character "+red << code[idx] << res+" in the context "+red;
-			for (int ii = idx-10; ii < idx+10; ii++) {
-				if (ii >= 0 && ii < length - 1) {
-					std::cout << code[ii];
-				}
-			}
-			std::cout << res << std::endl;
+	while (sb.sgetc() != EOF) {
+		if (prev == sb.pos()) {
+			std::string problem(1, sb.sgetc());
+	 		switch (sb.sgetc()) {
+	            case '\a':  problem = "\\a";        break;
+	            case '\b':  problem = "\\b";        break;
+	            case '\f':  problem = "\\f";        break;
+	            case '\n':  problem = "\\n";        break;
+	            case '\r':  problem = "\\r";        break;
+	            case '\t':  problem = "\\t";        break;
+	            case '\v':  problem = "\\v";        break;
+	            default  :							break;
+	        }
+			std::cout << "Problem with character "+red << problem << res+" at index "+magenta << sb.pos() << res+" in the context "+red;
+			problem = "";
+			int s = sb.pos() - 10 > 0 ? sb.pos() - 10 : 0;
+			int e = sb.pos() + 10 < length - 1 ? sb.pos() + 10 : length - 1;
+			sb.seek(e - s);
+			std::cout << sb.gets(e-s) << res << std::endl;
 			exit(1);
 		}
-		prev = idx;
-		if (code[idx] == '\'') {
-			lexeme += code[idx++];
+		prev = sb.pos();
+		if (sb.sgetc() == '\'') {
+			lexeme += sb.rget();
 			do {
-				if (code[idx] == '\\') {
-					lexeme += code[idx++];
-					lexeme += code[idx++];
+				if (sb.sgetc() == '\\') {
+					lexeme += sb.rget();
+					lexeme += sb.rget();
 				}
-				lexeme += code[idx++];
+				lexeme += sb.rget();
 			} while(lexeme.back() != '\'');
-			if (lexverbose) std::cout << "Character literal " << lexeme << std::endl;
-			if (lexeme.length() > 5) {
-				for (int ii = idx-10; ii < idx+10; ii++) {
-					if (ii >= 0 && ii < length - 1) {
-						std::cout << code[ii];
-					}
-				}				
-				exit(-1);
-			}
-			this->append(lexeme);
+			if (lexverbose) std::cout << lexeme.size() << " Character literal " << lexeme << std::endl;
+			this->append(lexeme, lex_type::Character);
 		}
-		else if (code[idx] == '\"') {
-			lexeme = std::string({code[idx++], code[idx++]});
+		else if (sb.sgetc() == '\"') {
+			lexeme = sb.gets(2);
 			while (lexeme.back() != '\"') {
 				if (lexeme.back() == '\\') {
-					lexeme += code[idx++];
+					lexeme += sb.rget();
 				}
-				lexeme += code[idx++];
+				lexeme += sb.rget();
 			}
-			if (lexverbose) std::cout << "String literal " << lexeme << std::endl;
-			this->append(lexeme);
+			if (lexverbose) std::cout << lexeme.size() << " String literal " << lexeme << std::endl;
+			this->append(lexeme, lex_type::String);
 		}
-		else if (code[idx] == '/' && code[idx + 1] == '*') {
-			lexeme = std::string({code[idx++], code[idx++]});
-			
+		else if (sb.sgetc() == '/' && sb.peek() == '*') {
+			lexeme = sb.gets(2);
 			while (lexeme.find("*/") == std::string::npos) {
-				lexeme += code[idx++];
+				lexeme += sb.rget();
 			}
-			if (lexverbose) std::cout << "Multiline comment " << lexeme << std::endl;
-			this->append(lexeme);
+			if (lexverbose) std::cout << lexeme.size() << " Multiline comment " << lexeme << std::endl;
+			this->append(lexeme, lex_type::Comment);
 		}
-		else if (idx < length - 1 && code[idx] == '/' && code[idx] == '/') {
-			while (code[idx] != EOF && code[idx] != '\n') {
-				idx++;
+		else if (sb.pos() < length - 1 && sb.sgetc() == '/' && sb.peek() == '/') {
+			while (sb.sgetc() != EOF && sb.sgetc() != '\n') {
+				sb.sbumpc();
 			}
 		}
-		else if (isalpha(code[idx]) || code[idx] == '_' || code[idx] == '~') {
-			while (isalpha(code[idx]) || isdigit(code[idx]) || code[idx] == '_' || code[idx] == '~') {
-				lexeme += code[idx++];
+		else if (isalpha(sb.sgetc()) || sb.sgetc() == '_' || sb.sgetc() == '~') {
+			while (isalpha(sb.sgetc()) || isdigit(sb.sgetc()) || sb.sgetc() == '_' || sb.sgetc() == '~') {
+				lexeme += sb.rget();
 			}
-			if (lexverbose) std::cout << "Variable or keyword " << lexeme << std::endl;
-			this->append(lexeme);
+			if (lexverbose) std::cout << lexeme.size() << " Variable or keyword " << lexeme << std::endl;
+			this->append(lexeme, lex_type::Keyword);
 		}
-		else if (code[idx] == '#') {
-			lexeme = code[idx++];
-			while (isalpha(code[idx])) {
-				lexeme += code[idx++];
+		else if (sb.sgetc() == '#') {
+			lexeme = sb.rget();
+			while (isalpha(sb.sgetc())) {
+				lexeme += sb.rget();
 			}
-			this->append(lexeme);
+			this->append(lexeme, lex_type::Unspecified);
 		}
-		else if (isdigit(code[idx])) {
-			while (isdigit(code[idx]) || code[idx] == '.') {
-				lexeme += code[idx++];
+		else if (isdigit(sb.sgetc())) {
+			while (isdigit(sb.sgetc()) || sb.sgetc() == '.') {
+				lexeme += sb.rget();
 			}
-			if (lexverbose) std::cout << "Numeric literal " << lexeme << std::endl;
-			this->append(lexeme);
+			if (lexverbose) std::cout << lexeme.size() << " Numeric literal " << lexeme << std::endl;
+			this->append(lexeme, lex_type::Number);
 		}
-		else if (idx < length - 1 && isoperator(std::string({code[idx], code[idx + 1]})) ) {
-			lexeme = {code[idx++], code[idx++]};
-			if (lexverbose) std::cout << "Double character operator " << lexeme << std::endl;
-			this->append(lexeme);
+		else if (sb.pos() < length - 1 && isoperator(sb.peek(2)) ) {
+			lexeme = sb.gets(2);
+			if (lexverbose) std::cout << lexeme.size() << " Double character operator " << lexeme << std::endl;
+			this->append(lexeme, lex_type::Operator);
 		}
-		else if (isoperator(code[idx])) {
-			lexeme = code[idx++];
-			if (lexverbose) std::cout << "Single character operator " << lexeme << std::endl;
-			this->append(lexeme);
+		else if (isoperator(sb.sgetc())) {
+			lexeme = sb.rget();
+			if (lexverbose) std::cout << lexeme.size() << " Single character operator " << lexeme << std::endl;
+			this->append(lexeme, lex_type::Operator);
 		}
-		else if (isspace(code[idx])) {
-			lexeme = code[idx++];
-			while (isspace(code[idx])) {
-				lexeme += code[idx++];
+		else if (isspace(sb.sgetc())) {
+			lexeme = sb.rget();
+			while (isspace(sb.sgetc())) {
+				lexeme += sb.rget();
 			}
-			this->append(lexeme);
+			std::string wspace("");
+			for (auto l : lexeme) {
+		 		switch (l) {
+		            case '\a':  wspace += "\\a";        break;
+		            case '\b':  wspace += "\\b";        break;
+		            case '\f':  wspace += "\\f";        break;
+		            case '\n':  wspace += "\\n";        break;
+		            case '\r':  wspace += "\\r";        break;
+		            case '\t':  wspace += "\\t";        break;
+		            case '\v':  wspace += "\\v";        break;
+		            case ' ' :  wspace += ".";		    break;
+		            default  :	wspace += l;		    break;
+				}
+			}
+			if (lexverbose) std::cout << lexeme.size() << " Whitespace " << wspace << std::endl;
+			this->append(lexeme, lex_type::WSpace);
 		}
-		else if (code[idx] == '\\') {
-			while(isspace(code[++idx])) {}
+		else if (sb.sgetc() == '\\') {
+			sb.sbumpc();
+			while(isspace(sb.rget())) {}
 		}
-		else if (code[idx] == ';') {
-			lexeme = code[idx++];
-			this->append(lexeme);
+		else if (sb.sgetc() == ';') {
+			lexeme = sb.rget();
+			this->append(lexeme, lex_type::Operator);
 		}
 	}
 }
 
 int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 	size_t size = lexemes.size();
-	int n = 0;
-	int ctx_start = 0;
+	int n, ctx_s, ctx_e = 0;
 	for (int ii = 0; ii < size; ii ++) {
-		if (lexemes[ii].first == "class" || lexemes[ii].first == "namespace") {
-			if (ii < size - 1) {
-				std::get<0>(lexemes[++ii].second) = make_context(ii - 1, ii);
+		if (lexemes[ii].lex == "class" || lexemes[ii].lex == "namespace") {
+			while (ii < size && lexemes[ii++].type != lex_type::Keyword) {}
+			if (ii < size) {
+				lexemes[++ii].make(ii - 1, ii, lexemes);
 				n += add_kw(lexemes[ii], keywords);
 			}
 			else {
 				std::cout << "Extraction of new keywords terminated: ";
-				std::cout << "last lexeme was specifier.";
+				std::cout << "no valid keyword found for specifier.\n";
+				return 0;
 			}
 		}
-		else if (lexemes[ii].first == "typedef") {
-			ctx_start = ii;
-			while (lexemes[ii + 1].first != ";") {
+		else if (lexemes[ii].lex == "typedef") {
+			ctx_s = ii;
+			while (lexemes[ii].lex != ";") {
 				ii++;
-				if (ii + 1 > size - 1) {
+				if (ii >= size) {
 					std::cout << "Extraction of new keywords terminated: ";
-					std::cout << "last lexeme was specifier.";
+					std::cout << "no teminating semicolon for typedef sentence.\n";
+					return 0;
 				}
 			}
-			std::get<0>(lexemes[ii].second) = make_context(ctx_start, ii);
+			ctx_e = ii;
+			while (lexemes[--ii].type == lex_type::WSpace) {}
+			lexemes[ii].make(ctx_s, ii, lexemes);
 			n += add_kw(lexemes[ii], keywords);
+			ii = ctx_e;
 		}
 	}
 	return n;
 }
 
-int Lexer::add_kw(std::pair<std::string, std::tuple<std::string, std::string, int> > context, std::vector<std::string> &keywords) {
-	if (!contains(keywords, context.first)) {
-		keywords.push_back(context.first);
-		auto [ctx, file, line] = context.second;
+int Lexer::add_kw(LexContext ctx, std::vector<std::string> &keywords) {
+	if (!contains(keywords, ctx.lex)) {
+		keywords.push_back(ctx.lex);
 		if (verbose) {
-			std::cout << "Keyword specifier found in line " << magenta << line << res+white+" of file " 
-				<< yellow+file+res+white << std::endl << "  Keyword identified as "
-				<< bright+cyan+context.first+res+white+"\n";
+			std::cout << "  New keyword found on line " << magenta << ctx.line << res+white+" of file " 
+				<< yellow+ctx.file+res+white << ",\n    identified as "
+				<< bright+cyan+ctx.lex+res+white+"\n";
 		}
 		return 1;
+	}
+	else {
+		if (verbose) {
+			std::cout << "  Duplicate keyword "+bright+cyan+ctx.lex+res+white+" found on line "+magenta 
+				<< ctx.line << res+white+" of file "+yellow+ctx.file+res+white << ",\n    moving on.\n";
+		}
 	}
 	return 0;
 }
 
-std::string Lexer::make_context(int start, int end) {
-	int lsize = lexemes.size() - 1;
-	int ctx_s = start - ctx_depth > 0 ? start - ctx_depth : 0;
-	int ctx_e = end + ctx_depth < lsize ? end + ctx_depth : lsize;
-	while (ctx_s > 0 && lexemes[ctx_s-- - 1].first.find("\n") == std::string::npos) {}
-	while (ctx_e < lsize && lexemes[ctx_e++ + 1].first.find("\n") == std::string::npos) {}
-	
-	std::string context("");
-	for (int ii = ctx_s; ii < ctx_e; ii ++) {
-		context += lexemes[ii].first;
-	}
-	return context;
-}
-
-std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > > Lexer::get_lexemes() {
+std::vector<LexContext> Lexer::get_lexemes() {
 	return lexemes;
 }
 
-void Lexer::append(std::string &lexeme) {
+void Lexer::append(std::string &lexeme, lex_type type) {
 	if (lexeme == "") return;
-	std::tuple meta = std::make_tuple("", file, stream.line());
-	lexemes.push_back(std::make_pair(lexeme, meta));
+	lexemes.push_back(LexContext(lexeme, type, "", file, sb.line()));
 	lexeme = "";
 }
 

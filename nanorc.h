@@ -33,19 +33,13 @@
 #include "colors.h"
 #include "rcio.h"
 #include "rcstreambuf.h"
+#include "lexcontext.h"
+#include "lexer.h"
 
 namespace po = boost::program_options;
 namespace std{
 	namespace filesystem = std::experimental::filesystem;
 
-};
-
-enum lex_type {
-	operators,
-	characters,
-	strings,
-	comment,
-	keyword
 };
 
 extern std::vector<std::string> keywords;
@@ -57,35 +51,6 @@ std::vector<std::string> rcParse(std::string rcfile, std::string mode);
 std::vector<std::string> lineParse(std::string line, std::vector<std::string>);
 
 void write(std::string filename, std::string mode);
-
-class Lexer {
-private:
-	static std::vector<std::string> onec_operators;
-	static std::vector<std::string> twoc_operators;
-
-	std::vector<std::string> specifiers;
-	std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > > lexemes;
-
-	std::string file;
-	RCStreamBuf stream;
-
-	int ctx_depth = 5;
-
-public:
-	Lexer(std::vector<std::string> specifiers = {});
-
-	void lex(std::string file, std::string language);
-	void cpp_lex();
-	int find_new_keywords(std::vector<std::string> &keywords);
-	int add_kw(std::pair<std::string, std::tuple<std::string, std::string, int> > context, std::vector<std::string> &keywords);
-	std::string make_context(int start, int end);
-	std::vector<std::pair<std::string, std::tuple<std::string, std::string, int> > > get_lexemes();
-	void append(std::string &lexeme);
-
-	bool isoperator(char c);
-	bool isoperator(std::string s);
-	int get_length(std::string file);
-};
 
 bool contains(std::vector<std::string> v, std::string item);					// Return if {v} contains {item}
 

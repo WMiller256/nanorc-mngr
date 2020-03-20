@@ -12,7 +12,7 @@ LIBDIRS	= $(LFLAGS) -L/usr/local/lib/ -L/usr/lib/boost/stage/lib/ -lstdc++fs
 LIBS		= -lboost_program_options -lncurses
 
 INC		= -I /usr/lib/boost/
-CFLAGS	= -Wno-deprecated-declarations -fopenmp -std=c++17 -O3
+CFLAGS	= -Wno-deprecated-declarations -fopenmp -std=c++17 -O3 -g
 CC			= /usr/bin/g++ $(CFLAGS) $(INC) $(LIBS) 
 
 #Output coloring
@@ -25,11 +25,12 @@ MAGENTA = \033[35m
 YELLOW  = \033[33m
 
 #Source files
-SRCS	= $(ABS)/rcio.c++ \
-		  $(ABS)/lexer.c++
+SRCS	= $(ABS)/rcio.c++
 OBJS	= $(BUILD)/rcio.o \
 		  $(BUILD)/lexer.o \
-		  $(BUILD)/nanorc.o
+		  $(BUILD)/rcstreambuf.o \
+		  $(BUILD)/nanorc.o \
+		  $(BUILD)/lexcontext.o
 
 #Builds
 all:

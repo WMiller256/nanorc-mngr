@@ -135,9 +135,10 @@ int main(int argn, char** argv) {
 	for (auto file: files) {
 		if (std::filesystem::exists(file)) {
 			std::cout << "Lexing "+yellow << file << res+white << " ... " << std::flush;
+			if (verbose) std::cout << "\n";
 			lexer.lex(file, "c++");
 			nchanged = lexer.find_new_keywords(keywords);
-			std::cout << bright+green+" complete"+res+white+".\n" << std::flush;
+			if (!verbose) std::cout << bright+green+" complete"+res+white+".\n" << std::flush;
 	
 		}
 	}
