@@ -14,6 +14,7 @@
 
 bool verbose;
 bool lexverbose;
+bool ctxverbose;
 std::vector<std::string> files;
 std::vector<std::string> keywords;
 std::string keywordColor;
@@ -60,6 +61,8 @@ int main(int argn, char** argv) {
 				" output.")
 			("lexverbose,l", po::bool_switch()->default_value(false), "Enable verbose"
 				" lexing output.")
+			("ctxverbose,x", po::bool_switch()->default_value(false), "Enable verbose"
+				" keyword context output.")
 			("recursive,r", po::bool_switch()->default_value(false), "Enable recursive"
 				"searcing.") 
 	    ;
@@ -81,6 +84,7 @@ int main(int argn, char** argv) {
 	user = vm["user"].as<bool>();
 	verbose = vm["verbose"].as<bool>();
 	lexverbose = vm["lexverbose"].as<bool>();
+	ctxverbose = vm["ctxverbose"].as<bool>();
 	recursive = vm["recursive"].as<bool>();
 	if (vm.count("files")) files = vm["files"].as<std::vector<std::string> >();
 	if (vm.count("specifiers")) specifiers = vm["specifiers"].as<std::vector<std::string> >();
@@ -128,7 +132,18 @@ int main(int argn, char** argv) {
 		std::cout << "Recursive search found the following files:\n";
 		for (int ii = 0; ii < files.size(); ii ++) {
 			std::cout << bright+yellow << files[ii] << res+white << std::endl;
-		}	
+		}
+	}
+	else {
+		auto f = std::begin(files);
+		while (f != std::end(files)) {
+			if (!contains(extensions, tolower(f->substr(f->find_last_of(".") + 1))) ) {
+				f = files.erase(f);
+			}
+			else {
+				f++;
+			}
+		}
 	}
 	Lexer lexer = Lexer(specifiers);
 	int nchanged;
@@ -193,9 +208,8 @@ std::vector<std::string> recurse(std::vector<std::string> paths) {
 							std::cout << "    " << iter->path().string() << std::endl;
 						}
 						pos = iter->path().string().find_last_of(".") + 1;
-						if (pos != std::string::npos && (std::find(extensions.begin(), 
-							  extensions.end(), tolower(iter->path().string().substr(pos))) 
-							  != extensions.end())) {
+						std::cout << tolower(iter->path().string().substr(pos)) << std::endl;
+						if (pos != std::string::npos && contains(extensions, tolower(iter->path().string().substr(pos))) ) {
 							files.push_back(iter->path().string());	
 						}
 						iter.increment(ec);

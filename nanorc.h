@@ -43,8 +43,9 @@ namespace std{
 };
 
 extern std::vector<std::string> keywords;
-extern bool lexverbose;
 extern bool verbose;
+extern bool lexverbose;
+extern bool ctxverbose;
 
 std::vector<std::string> recurse(std::vector<std::string> paths); 
 std::vector<std::string> rcParse(std::string rcfile, std::string mode);

@@ -11,9 +11,14 @@
 #ifndef LEXCONTEXT_H
 #define LEXCONTEXT_H
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "colors.h"
+
+extern bool ctxverbose;
 
 enum lex_type {
 	Operator,
@@ -36,10 +41,12 @@ public:
 	std::string file;
 	int line;
 
+	bool isspecifier = false;
 	int ctx_depth = 0;
 
 	void depth(int d);
 	void make(int s, int e, std::vector<LexContext> lexemes);
+	void print_context();
 };
 
 #endif // LEXCONTEXT_H

@@ -26,13 +26,36 @@ void LexContext::depth(int d) {
 
 void LexContext::make(int s, int e, std::vector<LexContext> lexemes) {
 	int lsize = lexemes.size() - 1;
-	int ctx_s = s - ctx_depth > 0 ? s - ctx_depth : 0;
-	int ctx_e = e + ctx_depth < lsize ? e + ctx_depth : lsize;
-	while (ctx_s > 0 && lexemes[ctx_s-- - 1].lex.find("\n") == std::string::npos) {}
-	while (ctx_e < lsize && lexemes[ctx_e++ + 1].lex.find("\n") == std::string::npos) {}
-	std::string context("");
-	for (int ii = ctx_s; ii < ctx_e; ii ++) {
-		context += lexemes[ii].lex;
+	while (s > 0) {
+		if (lexemes[s - 1].lex.find("\n") != std::string::npos) {
+			break;
+		}
+		s--;
 	}
-	this->ctx = context;
+	while (e < lsize && lexemes[e++ + 1].lex.find("\n") == std::string::npos) {}
+	std::string context("    ");
+	std::string lex;
+	bool highlighted = false;	
+	int rs, re;
+	for (int ii = s; ii < e; ii ++) {
+		if (lexemes[ii].isspecifier && !highlighted) context += green;
+		if ((rs = lexemes[ii].lex.find("\n")) != std::string::npos) {
+			lex = lexemes[ii].lex;
+			re = lex.find_last_of("\n");
+			lex.replace(rs, re - rs + 1, "\n    ");
+			context += lex;
+		}
+		else {
+			context += lexemes[ii].lex;
+		}
+		if (lexemes[ii].isspecifier && !highlighted) {
+			context += white+bright;
+			highlighted = true;			
+		}
+	}
+	this->ctx = context+"\n";
+}
+
+void LexContext::print_context() {
+	if (ctxverbose) std::cout << " in the context\n" << bright+ctx+res << std::flush;	
 }

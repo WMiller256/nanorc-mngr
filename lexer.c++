@@ -164,11 +164,31 @@ int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 	size_t size = lexemes.size();
 	int n, ctx_s, ctx_e = 0;
 	for (int ii = 0; ii < size; ii ++) {
-		if (lexemes[ii].lex == "class" || lexemes[ii].lex == "namespace") {
-			while (ii < size && lexemes[ii++].type != lex_type::Keyword) {}
+		if (contains(specifiers, lexemes[ii].lex)) lexemes[ii].isspecifier = true;
+		if (lexemes[ii].lex == "class") {
+			ctx_s = ii;
+			while (ii < size && (lexemes[++ii].type != lex_type::Keyword || lexemes[ii + 1].lex == "::") ) {}
 			if (ii < size) {
-				lexemes[++ii].make(ii - 1, ii, lexemes);
+				lexemes[ii].make(ctx_s, ii, lexemes);
 				n += add_kw(lexemes[ii], keywords);
+			}
+			else {
+				std::cout << "Extraction of new keywords terminated: ";
+				std::cout << "no valid keyword found for specifier.\n";
+				return 0;
+			}
+		}
+		else if  (lexemes[ii].lex == "namespace") {
+			ctx_s = ii;
+			while (ii < size && lexemes[++ii].lex != "{" && lexemes[ii].type != lex_type::Keyword) {}
+			if (ii < size) {
+				if (lexemes[ii].lex == "{")  {
+					while (lexemes[--ii].type != lex_type::Keyword) {}
+					if (lexemes[ii].lex != "namespace") {
+						lexemes[ii].make(ctx_s, ii, lexemes);
+						n += add_kw(lexemes[ii], keywords);	
+					}
+				}
 			}
 			else {
 				std::cout << "Extraction of new keywords terminated: ";
@@ -187,7 +207,7 @@ int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 				}
 			}
 			ctx_e = ii;
-			while (lexemes[--ii].type == lex_type::WSpace) {}
+			while (lexemes[--ii].type != lex_type::Keyword) {}
 			lexemes[ii].make(ctx_s, ii, lexemes);
 			n += add_kw(lexemes[ii], keywords);
 			ii = ctx_e;
@@ -197,19 +217,23 @@ int Lexer::find_new_keywords(std::vector<std::string> &keywords) {
 }
 
 int Lexer::add_kw(LexContext ctx, std::vector<std::string> &keywords) {
+	std::string file = ctx.file.substr(ctx.file.find_last_of("/") + 1);
 	if (!contains(keywords, ctx.lex)) {
 		keywords.push_back(ctx.lex);
 		if (verbose) {
-			std::cout << "  New keyword found on line " << magenta << ctx.line << res+white+" of file " 
-				<< yellow+ctx.file+res+white << ",\n    identified as "
-				<< bright+cyan+ctx.lex+res+white+"\n";
+			std::cout << std::left << "New keyword " << bright+cyan << std::setw(20) << ctx.lex << res+white 
+				<< " found on line " << magenta << std::setw(4) << ctx.line << res+white+" of file " 
+				<< yellow << std::setw(20) << file << res+white << std::flush;
+				ctx.print_context();
+				std::cout << std::endl;
 		}
 		return 1;
 	}
 	else {
-		if (verbose) {
-			std::cout << "  Duplicate keyword "+bright+cyan+ctx.lex+res+white+" found on line "+magenta 
-				<< ctx.line << res+white+" of file "+yellow+ctx.file+res+white << ",\n    moving on.\n";
+		if (false) {
+			std::cout << std::left << "Duplicate keyword "+bright+cyan << std::setw(15) << ctx.lex << res+white 
+				<< " found on line "+magenta << std::setw(4) << ctx.line << res+white+" of file "
+				<< yellow << std::setw(20) << file << res+white << ", moving on.\n";
 		}
 	}
 	return 0;

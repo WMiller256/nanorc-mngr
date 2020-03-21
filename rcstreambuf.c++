@@ -24,7 +24,8 @@ char RCStreamBuf::rget() {
 }
 
 char RCStreamBuf::peek() {
-	char c = sbumpc();
+	sbumpc();
+	char c = sgetc();
 	sungetc();
 	return c;
 }
