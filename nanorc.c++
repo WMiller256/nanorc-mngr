@@ -172,7 +172,7 @@ int main(int argn, char** argv) {
 		std::string in;
 		
 		std::cout << "The output path is "+bright+yellow+ofile+res+white+"\n";
-		std::cout << "Would you like to commit these changes to file? [y/n] "
+		std::cout << "Would you like to commit these changes to file? [y/n] \n"
 				<< std::flush;
 		std::cin >> in;
 		if (tolower(in) == "y" || tolower(in) == "yes") {
@@ -354,74 +354,69 @@ void write(std::string filename, std::string mode) {
 	if (mode == "lib") {
 		key = "## library keywords";
 	}
-	while (true) {
-		if (std::getline(file, line)) {
-			orig = line;
-			size_t start = line.find_first_not_of(" \t");
-			if (start != std::string::npos) {
-				line = line.substr(start);
-			}
-			if (tolower(line) == key) {
-				lines.push_back(line);
-				while (true) {
-					std::getline(file, line);
-					start = line.find_first_not_of(" \t");
-					size_t end = line.find_first_of("\"");
-					std::string prefix("");
-					if (start != std::string::npos && end != std::string::npos) {
-						prefix = line.substr(start, end-start-1);
-					}
-					else if (line.length() > start && line[start] == '#') {
-						continue;
-					}
-					else {
-						break;
-					}
-					if (prefix == "color "+keywordColor) {
-						while (prefix == "color "+keywordColor) {
-							std::getline(file, line);
-							start = line.find_first_not_of(" \t");
-							end = line.find_first_of("\"");
-							prefix = "";
-							if (start != std::string::npos && end != std::string::npos) {
-								prefix = line.substr(start, end-start-1);
-							}
-							else if (line.length() > start && line[start] =='#') {
-								continue;
-							}
-							else {
-								break;
-							}
-						}
-						std::string out("");
-						for (int kk = 0; kk < rgx.size(); kk ++) {
-							std::string prefix("\tcolor "+keywordColor+" \""
-											   +rgx[kk]+"(");
-							std::string suffix(")"+sfx[kk]+"\"");
-							out = prefix;
-							for (int ii = 0; ii < keywords.size(); ii ++) {
-								if (ii != 0 && ii % 10 != 0) {
-									out = out+"|";
-								}
-								out = out+keywords[ii];
-								if (ii % 10 == 9) {
-									lines.push_back(out+suffix);
-									out = prefix;
-								}
-							}
-							lines.push_back(out+suffix);
-						}
-						lines.push_back("");
-						break;
-					}
+	while (std::getline(file, line)) {
+		orig = line;
+		size_t start = line.find_first_not_of(" \t");
+		if (start != std::string::npos) {
+			line = line.substr(start);
+		}
+		if (tolower(line) == key) {
+			lines.push_back(line);
+			while (true) {
+				std::getline(file, line);
+				start = line.find_first_not_of(" \t");
+				size_t end = line.find_first_of("\"");
+				std::string prefix("");
+				if (start != std::string::npos && end != std::string::npos) {
+					prefix = line.substr(start, end-start-1);
 				}
-			}
-			else {
-				lines.push_back(orig);
+				else if (line.length() > start && line[start] == '#') {
+					continue;
+				}
+				else {
+					break;
+				}
+				if (prefix == "color "+keywordColor) {
+					while (prefix == "color "+keywordColor) {
+						std::getline(file, line);
+						start = line.find_first_not_of(" \t");
+						end = line.find_first_of("\"");
+						prefix = "";
+						if (start != std::string::npos && end != std::string::npos) {
+							prefix = line.substr(start, end-start-1);
+						}
+						else if (line.length() > start && line[start] =='#') {
+							continue;
+						}
+						else {
+							break;
+						}
+					}
+					std::string out("");
+					for (int kk = 0; kk < rgx.size(); kk ++) {
+						std::string prefix("\tcolor "+keywordColor+" \""
+										   +rgx[kk]+"(");
+						std::string suffix(")"+sfx[kk]+"\"");
+						out = prefix;
+						for (int ii = 0; ii < keywords.size(); ii ++) {
+							if (ii != 0 && ii % 10 != 0) {
+								out = out+"|";
+							}
+							out = out+keywords[ii];
+							if (ii % 10 == 9) {
+								lines.push_back(out+suffix);
+								out = prefix;
+							}
+						}
+						lines.push_back(out+suffix);
+					}
+					lines.push_back("");
+					break;
+				}
 			}
 		}
 		else {
-			break;
+			lines.push_back(orig);
 		}
 	}
 	std::ofstream ofile(filename);
