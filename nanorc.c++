@@ -36,11 +36,14 @@ int main(int argn, char** argv) {
 	bool user;
 	bool recursive;
 	std::string mode;
+	std::vector<std::string> to_add;
 	po::options_description description("Allowed Options");
 	po::positional_options_description positional;
 
 	std::cout << white;
 
+	// TODO - add disinclusion option
+	// TODO - add option to edit the new keyword set before writing to file
 	try {
 		description.add_options()
 			("files,f", po::value<std::vector<std::string> >()->multitoken(), 
@@ -55,7 +58,7 @@ int main(int argn, char** argv) {
 			("lib, l", po::bool_switch()->default_value(false), 
 				"Parsing mode for library keywords.")
 			("specifiers,i",po::value<std::vector<std::string> >()->multitoken(), 
-				"The keyword specifiers to include - C++ defaults are 'typedef',"
+				"The keyword specifiers to include - e.g. for C++: 'typedef',"
 				"'class', 'namespace'")
 			("verbose,v", po::bool_switch()->default_value(false), "Enable verbose"
 				" output.")
@@ -65,6 +68,8 @@ int main(int argn, char** argv) {
 				" keyword context output.")
 			("recursive,r", po::bool_switch()->default_value(false), "Enable recursive"
 				"searcing.") 
+			("add", po::value<std::vector<std::string> >()->multitoken(),
+				"Add a given keyword or set of keywords to the rc file")
 	    ;
 	    positional.add("color", 1);
 	    positional.add("rcfile", 1);
@@ -88,6 +93,7 @@ int main(int argn, char** argv) {
 	recursive = vm["recursive"].as<bool>();
 	if (vm.count("files")) files = vm["files"].as<std::vector<std::string> >();
 	if (vm.count("specifiers")) specifiers = vm["specifiers"].as<std::vector<std::string> >();
+	if (vm.count("add")) to_add = vm["add"].as<std::vector<std::string> >();
 	if (lib == false && user == false) user = true;
 	if (lib && user) lib = false;
 	if (keywordColor == "default" && lib) keywordColor = "brightyellow";
@@ -126,47 +132,54 @@ int main(int argn, char** argv) {
 	}
 
 	int nkeywords = keywords.size();
-	
-	if (recursive) {
-		files = recurse(files);
-		std::cout << "Recursive search found the following files:\n";
-		for (int ii = 0; ii < files.size(); ii ++) {
-			std::cout << bright+yellow << files[ii] << res+white << std::endl;
+	if (!to_add.empty()) {
+		for (auto a : to_add) {
+			keywords.push_back(a);
+			changed.push_back(true);
 		}
+		std::cout << "After processing "+bright+magenta << to_add.size() << res+white+" new keywords, " << std::flush;
 	}
-	else {
-		auto f = std::begin(files);
-		while (f != std::end(files)) {
-			if (!contains(extensions, tolower(f->substr(f->find_last_of(".") + 1))) ) {
-				f = files.erase(f);
-			}
-			else {
-				f++;
+	else {		
+		if (recursive) {
+			files = recurse(files);
+			std::cout << "Recursive search found the following files:\n";
+			for (int ii = 0; ii < files.size(); ii ++) {
+				std::cout << bright+yellow << files[ii] << res+white << std::endl;
 			}
 		}
-	}
-	Lexer lexer = Lexer(specifiers);
-	int nchanged;
-	for (auto file: files) {
-		if (std::filesystem::exists(file)) {
-			std::cout << "Lexing "+yellow << file << res+white << " ... " << std::flush;
-			if (verbose) std::cout << "\n";
-			lexer.lex(file, "c++");
-			nchanged = lexer.find_new_keywords(keywords);
-			if (!verbose) std::cout << bright+green+" complete"+res+white+".\n" << std::flush;
-	
+		else {
+			auto f = std::begin(files);
+			while (f != std::end(files)) {
+				if (!contains(extensions, tolower(f->substr(f->find_last_of(".") + 1))) ) {
+					f = files.erase(f);
+				}
+				else {
+					f++;
+				}
+			}
 		}
-	}
-	int unchanged = changed.size();
-	for (int ii = unchanged; ii < keywords.size(); ii ++) {
-		changed.push_back(true);
+		Lexer lexer = Lexer(specifiers);
+		int nchanged;
+		for (auto file: files) {
+			if (std::filesystem::exists(file)) {
+				std::cout << "Lexing "+yellow << file << res+white << " ... " << std::flush;
+				if (verbose) std::cout << "\n";
+				lexer.lex(file, "c++");
+				nchanged = lexer.find_new_keywords(keywords);
+				if (!verbose) std::cout << bright+green+" complete"+res+white+".\n" << std::flush;
+			}
+		}
+		int unchanged = changed.size();
+		for (int ii = unchanged; ii < keywords.size(); ii ++) {
+			changed.push_back(true);
+		}
+		std::cout << "After parsing "+bright+magenta << files.size() << res+white+" files, ";
 	}
 
 	sort(keywords, changed);
 
 	if (nkeywords != keywords.size()) {
-		std::cout << "After parsing "+bright+magenta << files.size() << res+white+" files";
-		std::cout << " the "+bright+pref+" Keyword"+res+white+" set is now\n";
+		std::cout << "the "+bright+pref+" Keyword"+res+white+" set is now\n";
 		print_table(keywords, changed, mode);
 	
 		std::string in;
