@@ -37,13 +37,19 @@ int main(int argn, char** argv) {
 	bool recursive;
 	std::string mode;
 	std::vector<std::string> to_add;
+	std::vector<std::string> to_remove;
+	std::vector<std::string> to_ignore;
 	po::options_description description("Allowed Options");
 	po::positional_options_description positional;
 
 	std::cout << white;
 
-	// TODO - add disinclusion option
+	// TODO - add remove/disinclude option with disincluded keywords listed 
+	//        in specific format in comments of rc file
 	// TODO - add option to edit the new keyword set before writing to file
+	// TODO - add enum specifier support for C++
+	// TODO - change default output file to that specified in ~/.nanorc, if 
+	//        ~/.nanorc exists.
 	try {
 		description.add_options()
 			("files,f", po::value<std::vector<std::string> >()->multitoken(), 
@@ -69,7 +75,15 @@ int main(int argn, char** argv) {
 			("recursive,r", po::bool_switch()->default_value(false), "Enable recursive"
 				"searcing.") 
 			("add", po::value<std::vector<std::string> >()->multitoken(),
-				"Add a given keyword or set of keywords to the rc file")
+				"Add a given keyword or set of keywords to the rc file. [remove]"
+				" and [ignore] options will be ignored when [add] is specified.")
+			("remove", po::value<std::vector<std::string> >()->multitoken(),
+				"Remove a given keyword or set of keywords from the rc file,"
+				" but does not ignore them in the future. [ignore] option will"
+				" be ignored when [remove] is specified.")
+			("ignore", po::value<std::vector<std::string> >()->multitoken(),
+				"Sets a keyword or set of keywords to be ignored by the "
+				"parser, but not if they are added manually via the [add] option.")
 	    ;
 	    positional.add("color", 1);
 	    positional.add("rcfile", 1);
@@ -94,6 +108,8 @@ int main(int argn, char** argv) {
 	if (vm.count("files")) files = vm["files"].as<std::vector<std::string> >();
 	if (vm.count("specifiers")) specifiers = vm["specifiers"].as<std::vector<std::string> >();
 	if (vm.count("add")) to_add = vm["add"].as<std::vector<std::string> >();
+	if (vm.count("remove")) to_remove = vm["remove"].as<std::vector<std::string> >();
+	if (vm.count("ignore")) to_ignore = vm["ignore"].as<std::vector<std::string> >();
 	if (lib == false && user == false) user = true;
 	if (lib && user) lib = false;
 	if (keywordColor == "default" && lib) keywordColor = "brightyellow";
@@ -138,6 +154,19 @@ int main(int argn, char** argv) {
 			changed.push_back(true);
 		}
 		std::cout << "After processing "+bright+magenta << to_add.size() << res+white+" new keywords, " << std::flush;
+	}
+	else if (!to_remove.empty()) {
+		int count;
+		for (int ii = 0; ii < to_remove.size(); ii ++) {
+			count = 0;
+			std::string r = to_remove[ii];
+			if (contains(keywords, r)) {
+				keywords.erase(keywords.begin() + ii);
+				changed.erase(changed.begin() + ii);
+				count++;
+			}
+		}
+		std::cout << "After removing "+bright+magenta << count << res+white+" keywords, " << std::flush;
 	}
 	else {		
 		if (recursive) {
