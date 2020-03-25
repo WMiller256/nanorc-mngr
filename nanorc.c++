@@ -125,6 +125,21 @@ int main(int argn, char** argv) {
 		mode = "user";
 	}
 
+	std::string home(getenv("HOME"));
+	if (std::filesystem::exists(home+"/.nanorc")) {
+		std::ifstream f(home+"/.nanorc");
+		std::string line;
+		while(std::getline(f, line)) {
+			if (line.find("c.nanorc") != std::string::npos) {
+				ofile = line.substr(line.find_last_of(" \t") + 1);
+				if (ofile.find("~") != std::string::npos) {
+					ofile.replace(ofile.find("~"), 1, home);
+				}
+				break;
+			}
+		}
+	}
+
 	std::string pref = "User";
 	if (std::filesystem::exists(ofile)) {
 		keywords = rcParse(ofile, mode);
