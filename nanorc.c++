@@ -35,6 +35,7 @@ int main(int argn, char** argv) {
 	bool lib;
 	bool user;
 	bool recursive;
+	bool confirm;
 	std::string mode;
 	std::vector<std::string> to_add;
 	std::vector<std::string> to_remove;
@@ -74,6 +75,7 @@ int main(int argn, char** argv) {
 				" keyword context output.")
 			("recursive,r", po::bool_switch()->default_value(false), "Enable recursive"
 				"searcing.") 
+			("no-confirm,y", po::bool_switch()->default_value(false), "Disable confirm before write.") 
 			("add", po::value<std::vector<std::string> >()->multitoken(),
 				"Add a given keyword or set of keywords to the rc file. [remove]"
 				" and [ignore] options will be ignored when [add] is specified.")
@@ -105,6 +107,7 @@ int main(int argn, char** argv) {
 	lexverbose = vm["lexverbose"].as<bool>();
 	ctxverbose = vm["ctxverbose"].as<bool>();
 	recursive = vm["recursive"].as<bool>();
+	confirm = vm["no-confirm"].as<bool>();
 	if (vm.count("files")) files = vm["files"].as<std::vector<std::string> >();
 	if (vm.count("specifiers")) specifiers = vm["specifiers"].as<std::vector<std::string> >();
 	if (vm.count("add")) to_add = vm["add"].as<std::vector<std::string> >();
@@ -163,21 +166,28 @@ int main(int argn, char** argv) {
 	}
 
 	int nkeywords = keywords.size();
+	int count;
 	if (!to_add.empty()) {
+		count = 0;
 		for (auto a : to_add) {
-			keywords.push_back(a);
-			changed.push_back(true);
+			std::cout << a << std::endl;
+			std::cout << std::boolalpha << contains(keywords, a) << std::endl;
+			if (!contains(keywords, a)) {
+				keywords.push_back(a);
+				changed.push_back(true);
+				count++;
+			}
 		}
-		std::cout << "After processing "+bright+magenta << to_add.size() << res+white+" new keywords, " << std::flush;
+		std::cout << "After processing "+bright+magenta << count << res+white+" new keywords, " << std::flush;
 	}
 	else if (!to_remove.empty()) {
-		int count;
+		count = 0;
 		for (int ii = 0; ii < to_remove.size(); ii ++) {
-			count = 0;
 			std::string r = to_remove[ii];
 			if (contains(keywords, r)) {
-				keywords.erase(keywords.begin() + ii);
-				changed.erase(changed.begin() + ii);
+				int ridx = std::find(keywords.begin(), keywords.end(), r) - keywords.begin();
+				keywords.erase(keywords.begin() + ridx);
+				changed.erase(changed.begin() + ridx);
 				count++;
 			}
 		}
@@ -225,22 +235,31 @@ int main(int argn, char** argv) {
 	if (nkeywords != keywords.size()) {
 		std::cout << "the "+bright+pref+" Keyword"+res+white+" set is now\n";
 		print_table(keywords, changed, mode);
-	
-		std::string in;
-		
-		std::cout << "The output path is "+bright+yellow+ofile+res+white+"\n";
-		std::cout << "Would you like to commit these changes to file? [y/n] \n"
-				<< std::flush;
-		std::cin >> in;
-		if (tolower(in) == "y" || tolower(in) == "yes") {
+
+		if (!confirm) {
+			std::string in;
+			std::cout << "The output path is "+bright+yellow+ofile+res+white+"\n";
+			std::cout << "Would you like to commit these changes to file? [y/n] \n"
+					<< std::flush;
+			std::cin >> in;
+			if (tolower(in) == "y" || tolower(in) == "yes") {
+				write(ofile, mode);
+			}
+		}
+		else {
 			write(ofile, mode);
 		}
 		
 	}
 	else {
-		std::cout << "After parsing "+bright+magenta << files.size() << res+white+
-				" files, no new keywords were found - the "+bright+pref+" Keyword"
-				+res+white+" set is unchanged." << std::endl;
+		if (to_add.empty() && to_remove.empty()) {
+			std::cout << "After parsing "+bright+magenta << files.size() << res+white+
+					" files, no new keywords were found - the "+bright+pref+" Keyword"
+					+res+white+" set is unchanged." << std::endl;
+		}
+		else {
+			std::cout << "The "+bright+pref+" Keyword"+res+white+" set is unchanged." << std::endl;
+		}
 	}
 	
 }
