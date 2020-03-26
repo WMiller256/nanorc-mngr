@@ -17,12 +17,13 @@ bool lexverbose;
 bool ctxverbose;
 std::vector<std::string> files;
 std::vector<std::string> keywords;
+std::vector<std::string> ignored;
 std::string keywordColor;
 std::vector<std::string> specifiers;
 
 static std::vector<std::string> extensions = {"h", "h++", "hpp", "c", "c++", "cpp"};
 static std::vector<std::string> rgx = {"[^A-Za-z0-9\\_]", "^", "[^A-Za-z0-9\\_]", "^"};
-static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]*", "[^A-Za-z0-9\\_]", "$", "$"};
+static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]+", "[^A-Za-z0-9\\_]", "$", "$"};
 
 static std::vector<std::string> cpp_types = {"bool", "int", "char", "true", "false", "float", 
 											  "double", "long", "signed", "unsigned"};
@@ -49,8 +50,6 @@ int main(int argn, char** argv) {
 	//        in specific format in comments of rc file
 	// TODO - add option to edit the new keyword set before writing to file
 	// TODO - add enum specifier support for C++
-	// TODO - change default output file to that specified in ~/.nanorc, if 
-	//        ~/.nanorc exists.
 	try {
 		description.add_options()
 			("files,f", po::value<std::vector<std::string> >()->multitoken(), 
@@ -335,6 +334,16 @@ std::vector<std::string> rcParse(std::string rcfile, std::string mode) {
 			if (start != std::string::npos) {
 				line = line.substr(start); 
 			}
+			if (tolower(line) == "## ignore") {
+				while (true) {
+					std::getline(file, line);
+					line = line.substr(line.find("#")).substr(line.find_first_not_of(" \t"));
+					if (line.find("\n") != std::string::npos) {
+						line = line.substr(line.find("\n") - 1);
+					}
+					ignored.push_back(line);
+				}
+			}
 			if (tolower(line) == key) {
 				std::vector<std::string> parsed;
 				while (true) {
@@ -421,6 +430,7 @@ std::vector<std::string> lineParse(std::string line, std::vector<std::string> ke
 	}
 	return parsed;
 }
+
 void write(std::string filename, std::string mode) {
 	std::ifstream file(filename);
 	std::string line("");
