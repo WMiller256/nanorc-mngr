@@ -169,8 +169,6 @@ int main(int argn, char** argv) {
 	if (!to_add.empty()) {
 		count = 0;
 		for (auto a : to_add) {
-			std::cout << a << std::endl;
-			std::cout << std::boolalpha << contains(keywords, a) << std::endl;
 			if (!contains(keywords, a)) {
 				keywords.push_back(a);
 				changed.push_back(true);
@@ -191,6 +189,17 @@ int main(int argn, char** argv) {
 			}
 		}
 		std::cout << "After removing "+bright+magenta << count << res+white+" keywords, " << std::flush;
+	}
+	else if (!to_ignore.empty()) {
+		count = 0;
+		for (auto i : to_ignore) {
+			if (!contains(ignored, i)) {
+				ignored.push_back(i);
+				count ++;
+			}
+		}
+		std::cout << "Added "+bright+magenta << count << res+white+" keywords to be ignored." << std::endl;
+		return 0;
 	}
 	else {		
 		if (recursive) {
