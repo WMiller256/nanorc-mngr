@@ -346,11 +346,14 @@ std::vector<std::string> rcParse(std::string rcfile, std::string mode) {
 			if (tolower(line) == "## ignore") {
 				while (true) {
 					std::getline(file, line);
-					line = line.substr(line.find("#")).substr(line.find_first_not_of(" \t"));
-					if (line.find("\n") != std::string::npos) {
-						line = line.substr(line.find("\n") - 1);
+					if (line.find("#") != std::string::npos) {
+						line = line.substr(line.find("#")).substr(line.find_first_not_of(" \t"));
+						if (line.find("\n") != std::string::npos) {
+							line = line.substr(line.find("\n") - 1);
+						}
+						ignored.push_back(line);
 					}
-					ignored.push_back(line);
+					else break;
 				}
 			}
 			if (tolower(line) == key) {
@@ -454,6 +457,18 @@ void write(std::string filename, std::string mode) {
 		size_t start = line.find_first_not_of(" \t");
 		if (start != std::string::npos) {
 			line = line.substr(start);
+		}
+		if (tolower(line) == "## ignore") {
+			while (true) {
+				std::getline(file, line);
+				if (line.find("#") == std::string::npos) {
+					lines.push_back("");
+					break;
+				}
+			}
+			for (auto i : ignored) {
+				lines.push_back("# "+i);
+			}
 		}
 		if (tolower(line) == key) {
 			lines.push_back(line);
