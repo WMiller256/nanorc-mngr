@@ -23,7 +23,7 @@ std::vector<std::string> specifiers;
 
 static std::vector<std::string> extensions = {"h", "h++", "hpp", "c", "c++", "cpp"};
 static std::vector<std::string> rgx = {"[^A-Za-z0-9\\_]", "^", "[^A-Za-z0-9\\_]", "^"};
-static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]+", "[^A-Za-z0-9\\_]", "$", "$"};
+static std::vector<std::string> sfx = {"[^A-Za-z0-9\\_]", "[^A-Za-z0-9\\_]", "$", "$"};
 
 static std::vector<std::string> cpp_types = {"bool", "int", "char", "true", "false", "float", 
 											  "double", "long", "signed", "unsigned"};
