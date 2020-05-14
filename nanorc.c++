@@ -35,6 +35,7 @@ int main(int argn, char** argv) {
 	std::string ofile("");
 	bool lib;
 	bool user;
+	bool builtin;
 	bool recursive;
 	bool confirm;
 	std::string mode;
@@ -63,6 +64,8 @@ int main(int argn, char** argv) {
 				"Parsing mode for user defined keywords.")
 			("lib, l", po::bool_switch()->default_value(false), 
 				"Parsing mode for library keywords.")
+			("builtin, b", po::bool_switch()->default_value(false),
+				"Parsing mode for builtin keywords.")
 			("specifiers,i",po::value<std::vector<std::string> >()->multitoken(), 
 				"The keyword specifiers to include - e.g. for C++: 'typedef',"
 				"'class', 'namespace'")
@@ -88,7 +91,6 @@ int main(int argn, char** argv) {
 	    ;
 	    positional.add("color", 1);
 	    positional.add("rcfile", 1);
-	    
 	}
 	catch (...) {
 		std::cout << "Error in boost initialization\n" << std::endl; 
@@ -102,6 +104,7 @@ int main(int argn, char** argv) {
 	
 	lib = vm["lib"].as<bool>();
 	user = vm["user"].as<bool>();
+	builtin = vm["builtin"].as<bool>();
 	verbose = vm["verbose"].as<bool>();
 	lexverbose = vm["lexverbose"].as<bool>();
 	ctxverbose = vm["ctxverbose"].as<bool>();
@@ -112,20 +115,21 @@ int main(int argn, char** argv) {
 	if (vm.count("add")) to_add = vm["add"].as<std::vector<std::string> >();
 	if (vm.count("remove")) to_remove = vm["remove"].as<std::vector<std::string> >();
 	if (vm.count("ignore")) to_ignore = vm["ignore"].as<std::vector<std::string> >();
-	if (lib == false && user == false) user = true;
-	if (lib && user) lib = false;
+	if (!lib && !user && !builtin) user = true;
+	if (lib && user && builtin) {
+		lib = false;
+		builtin = false;
+	}
 	if (keywordColor == "default" && lib) keywordColor = "brightyellow";
 	if (keywordColor == "default" && user) keywordColor = "brightcyan";
+	if (keywordColor == "default" && builtin) keywordColor = "green";
 	if (specifiers.empty()) {
 		specifiers = {"typedef", "class", "namespace"};
 	}
 	
-	if (lib) {
-		mode = "lib";
-	}
-	else {
-		mode = "user";
-	}
+	if (lib) mode = "lib";
+	else if (builtin) mode = "builtin";
+	else mode = "user";
 
 	std::string home(getenv("HOME"));
 	if (std::filesystem::exists(home+"/.nanorc")) {
@@ -145,9 +149,8 @@ int main(int argn, char** argv) {
 	std::string pref = "User";
 	if (std::filesystem::exists(ofile)) {
 		keywords = rcParse(ofile, mode);
-		if (lib) {
-			pref = "Library";
-		}
+		if (lib) pref = "Library";
+		else if (builtin) pref = "Builtin";
 		if (keywords.size() != 0 && verbose) {
 			std::cout << "Current "+bright+pref+" Keyword"+res+white+" set is as follows.\n";
 			sort(keywords);
@@ -334,9 +337,10 @@ std::vector<std::string> rcParse(std::string rcfile, std::string mode) {
 	std::vector<std::string> keywords;
 	std::string key = "## custom keywords";
 	if (verbose) std::cout << "Parsing existing keywords... \n"; 
-	if (mode == "lib") {
-		key = "## library keywords";
-	}
+	
+	if (mode == "lib") key = "## library keywords";
+	else if (mode == "builtin") key = "## builtin keywords";
+	
 	while (true) {
 		if (std::getline(file,line)) {
 			size_t start = line.find_first_not_of(" \t");
@@ -367,14 +371,9 @@ std::vector<std::string> rcParse(std::string rcfile, std::string mode) {
 						end != std::string::npos) {
 						prefix = line.substr(start, end-start-1);
 					}
-					else if (line.length() > start && line[start] == '#') {
-						continue;	
-					}
+					else if (line.length() > start && line[start] == '#') continue;	
 					else {
-						if (verbose) {
-							std::cout << "End of existing keywords found - "
-									 "no matching quotations.\n";
-						}
+						if (verbose) std::cout << "End of existing keywords found - no matching quotations.\n";
 						break;
 					}
 					if (prefix == "color "+keywordColor) {
@@ -448,10 +447,11 @@ void write(std::string filename, std::string mode) {
 	std::string line("");
 	std::string orig("");
 	std::string key = "## custom keywords";
-	std::vector<std::string> lines;
-	if (mode == "lib") {
-		key = "## library keywords";
-	}
+	std::vector<std::string> lines;\
+	
+	if (mode == "lib") key = "## library keywords";
+	else if (mode == "builtin") key = "## builtin keywords";
+	
 	while (std::getline(file, line)) {
 		orig = line;
 		size_t start = line.find_first_not_of(" \t");

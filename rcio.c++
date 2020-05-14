@@ -51,19 +51,14 @@ void print_table(std::vector<std::string> strings, std::vector<bool> changed,
 				tab(tabsize);
 				break;
 			}
-			if (mode == "user") {
-				std::cout << bright+cyan;
-			}
-			else if (mode == "lib") {
-				std::cout << bright+yellow;
-			}
+			if (mode == "user") std::cout << bright+cyan;
+			else if (mode == "lib") std::cout << bright+yellow;
+			else if (mode == "builtin") std::cout << green;
 			if (keywords.begin(), std::find(keywords.begin(), 
 				 keywords.end(), strings[ii+jj*nrows]) != keywords.end()) {
 				int pos = std::distance(keywords.begin(), std::find(
 				keywords.begin(), keywords.end(), strings[ii+jj*nrows]));
-				if (pos < changed.size() && changed[pos]) {	
-					std::cout << bright+green;
-				}
+				if (pos < changed.size() && changed[pos]) std::cout << bright+green;
 			}
 			std::cout << std::left << std::setw(max_length) << strings[ii+jj*nrows];
 			std::cout << " " << white+res;
