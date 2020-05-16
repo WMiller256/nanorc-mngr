@@ -509,7 +509,7 @@ void write(std::string filename, std::string mode) {
 						std::string suffix(")"+sfx[kk]+"\"");
 						out = prefix;
 						for (int ii = 0; ii < keywords.size(); ii ++) {
-							if (ii != 0 && ii % 10 != 0) {
+							if (ii % 10 != 0) {
 								out = out+"|";
 							}
 							out = out+keywords[ii];
@@ -518,7 +518,8 @@ void write(std::string filename, std::string mode) {
 								out = prefix;
 							}
 						}
-						lines.push_back(out+suffix);
+						if (out != prefix) lines.push_back(out+suffix);
+						if (mode == "builtin") lines.push_back(prefix+"const"+suffix);
 					}
 					lines.push_back("");
 					break;
@@ -530,8 +531,8 @@ void write(std::string filename, std::string mode) {
 		}
 	}
 	std::ofstream ofile(filename);
-	for (int ii = 0; ii < lines.size(); ii ++) {
-		ofile << lines[ii] << "\n";		
+	for (auto line : lines) {
+		ofile << line << "\n";
 	}
 	
 	file.close();
