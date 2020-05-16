@@ -545,10 +545,11 @@ bool contains(std::vector<std::string> v, std::string item) {
 
 void sort(std::vector<std::string> &keywords) {
 	for (int ii = 0; ii < keywords.size(); ii ++) {
+		if (keywords[ii][0] == char(0)) keywords.erase(keywords.begin() + ii);
 		for (int jj = ii; jj < keywords.size(); jj ++) {
 			if (keywords[ii].compare(keywords[jj]) > 0) {
 				std::swap(keywords[ii], keywords[jj]);
-			} 
+			}
 		}
 	}
 	return;
@@ -563,6 +564,7 @@ void sort(std::vector<std::string> &keywords, std::vector<bool> &changed) {
 		return;
 	}
 	for (int ii = 0; ii < keywords.size(); ii ++) {
+		if (keywords[ii][0] == char(0)) keywords.erase(keywords.begin() + ii);
 		for (int jj = ii; jj < keywords.size(); jj ++) {
 			if (keywords[ii].compare(keywords[jj]) > 0) {
 				std::swap(keywords[ii], keywords[jj]);
